@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="phonebooth">
+<html lang="en" data-theme="phonebooth" data-mode="pomodoro">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,35 +10,54 @@
 </head>
 <body>
 
-  <!-- floating star particles -->
-  <div id="starbg"></div>
+  <!-- ambient background layers -->
+  <div id="mode-bg"></div>
+  <div id="star-bg"></div>
 
-  <!-- scrolling ticker tape -->
-  <button class="ticker-toggle" id="tickerToggle" title="toggle ticker">ticker ✦</button>
-  <div class="ticker-wrap" id="tickerWrap">
+  <!-- scrolling ticker (toggled via button) -->
+  <button class="ticker-toggle" id="ticker-toggle" title="toggle ticker">ticker ✦</button>
+  <div class="ticker-wrap" id="ticker-wrap">
     <div class="ticker">
-      <div class="ticker-t" id="tickerEl"></div>
+      <div class="ticker-track" id="ticker-track"></div>
     </div>
   </div>
 
-  <div class="wrap">
+  <div class="app-wrap">
 
-    <!-- ── HEADER ── -->
-    <header>
+    <!-- ── HEADER ───────────────────────────────────────── -->
+    <header class="app-header">
       <div>
-        <div class="logo">grind.app<span class="blink">_</span></div>
-        <div class="logo-s">pomodoro timer for the delusional achiever</div>
+        <h1 class="logo">grind.app<span class="blink">_</span></h1>
+        <p class="logo-tagline">pomodoro for the delusional achiever</p>
       </div>
-      <div class="hdr-r">
+      <div class="header-controls">
+
         <!-- theme switcher -->
-        <div class="themes" id="themeWrap">
-          <button class="tb on" data-t="phonebooth" title="phone booth">📞</button>
-          <button class="tb"    data-t="transit"    title="transit mode">🚆</button>
-          <button class="tb"    data-t="streetwear" title="streetwear">🔥</button>
-          <button class="tb"    data-t="y2k"        title="y2k bby">💗</button>
+        <div class="theme-switcher" id="theme-switcher">
+          <button class="theme-btn active" data-theme="phonebooth" title="phone booth">📞</button>
+          <button class="theme-btn"        data-theme="transit"    title="transit">🚆</button>
+          <button class="theme-btn"        data-theme="streetwear" title="streetwear">🔥</button>
+          <button class="theme-btn"        data-theme="y2k"        title="y2k">💗</button>
         </div>
+
+        <!-- chill mode: sun = full, moon = calm -->
+        <button class="icon-btn" id="chill-btn" title="toggle chill mode">
+          <svg class="icon-sun" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1"  x2="12" y2="3"/>  <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1"  y1="12" x2="3"  y2="12"/>  <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22"  y1="19.78" x2="5.64"  y2="18.36"/>
+            <line x1="18.36" y1="5.64"  x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" style="display:none">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+
         <!-- settings gear -->
-        <button class="ibtn" id="settBtn" title="settings">
+        <button class="icon-btn" id="settings-btn" title="settings">
           <svg viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
@@ -55,49 +74,56 @@
       </div>
     </header>
 
-    <!-- ── MODE TABS ── -->
-    <div class="modes" id="modeWrap">
-      <button class="mb on" data-mode="pomodoro">🍅 Pomodoro</button>
-      <button class="mb"    data-mode="short">💤 Short Break</button>
-      <button class="mb"    data-mode="long">🛋 Long Break</button>
-    </div>
+    <!-- ── MODE TABS ─────────────────────────────────────── -->
+    <nav class="mode-tabs" id="mode-tabs">
+      <button class="mode-tab active" data-mode="pomodoro">🍅 Pomodoro</button>
+      <button class="mode-tab"        data-mode="short">💤 Short Break</button>
+      <button class="mode-tab"        data-mode="long">🛋 Long Break</button>
+    </nav>
 
-    <!-- ── MAIN GRID ── -->
-    <div class="grid">
+    <!-- ── MAIN GRID ─────────────────────────────────────── -->
+    <div class="main-grid">
 
-      <!-- left: timer -->
-      <div class="tsec">
+      <!-- LEFT: timer + focused task + quote + controls -->
+      <div class="timer-panel">
 
-        <!-- radial SVG ring -->
-        <div class="rw">
+        <!-- radial countdown ring -->
+        <div class="ring-wrap">
           <svg viewBox="0 0 286 286">
-            <circle id="rdeco"  cx="143" cy="143" r="136"/>
-            <circle id="rtrack" cx="143" cy="143" r="125"/>
-            <circle id="rglow"  cx="143" cy="143" r="125"/>
-            <circle id="rprog"  cx="143" cy="143" r="125"/>
+            <circle id="ring-deco"  cx="143" cy="143" r="136"/>
+            <circle id="ring-track" cx="143" cy="143" r="125"/>
+            <circle id="ring-glow"  cx="143" cy="143" r="125"/>
+            <circle id="ring-prog"  cx="143" cy="143" r="125"/>
           </svg>
-          <div class="tinn">
-            <div class="tdigs" id="tdisp">25:00</div>
-            <div class="tlbl"  id="tlbl">FOCUS TIME</div>
-            <div class="tstat" id="tstat">&nbsp;</div>
+          <div class="ring-center">
+            <div class="time-digits" id="time-digits">25:00</div>
+            <div class="time-mode"   id="time-mode">FOCUS TIME</div>
+            <div class="time-status" id="time-status">&nbsp;</div>
           </div>
         </div>
 
-        <!-- motivational quote -->
-        <div class="qbox" id="qbox">
-          <div class="qtxt" id="qtxt">ready when you are bestie 👀</div>
+        <!-- active focused task chip (hidden until task is focused) -->
+        <div class="focused-chip" id="focused-chip">
+          <span class="focused-chip-label">now:</span>
+          <span class="focused-chip-text" id="focused-chip-text">…</span>
+          <button class="focused-chip-clear" id="focused-chip-clear" title="clear focus">×</button>
         </div>
 
-        <!-- timer controls -->
-        <div class="ctrls">
-          <button class="cb" id="resetBtn" title="reset">
+        <!-- rotating encouragement quote -->
+        <div class="quote-box" id="quote-box">
+          <p class="quote-text" id="quote-text">ready when you are bestie 👀</p>
+        </div>
+
+        <!-- play / reset / skip -->
+        <div class="timer-controls">
+          <button class="ctrl-btn" id="reset-btn" title="reset">
             <svg viewBox="0 0 24 24">
               <polyline points="1 4 1 10 7 10"/>
               <path d="M3.51 15a9 9 0 1 0 .49-3.73"/>
             </svg>
           </button>
-          <button class="pb" id="playBtn">▶</button>
-          <button class="cb" id="skipBtn" title="skip">
+          <button class="play-btn" id="play-btn">▶</button>
+          <button class="ctrl-btn" id="skip-btn" title="skip">
             <svg viewBox="0 0 24 24">
               <polygon points="5 4 15 12 5 20 5 4"/>
               <line x1="19" y1="5" x2="19" y2="19"/>
@@ -105,91 +131,91 @@
           </button>
         </div>
 
-        <!-- session progress dots -->
-        <div class="dots" id="dotsEl"></div>
+        <!-- pomodoro cycle dots -->
+        <div class="session-dots" id="session-dots"></div>
 
-      </div><!-- /tsec -->
-
-      <!-- right: task list -->
-      <div class="tpanel">
-        <div class="phdr">
-          <span class="plbl">the grind list 📋</span>
-          <span class="tcount" id="tcnt">0 tasks</span>
-        </div>
-        <div class="tirow">
-          <input class="tinp" id="tinput" type="text" placeholder="add a task bestie..." maxlength="120">
-          <button class="tadd" id="addBtn">+</button>
-        </div>
-        <div class="tlist" id="tlist"></div>
       </div>
 
-    </div><!-- /grid -->
-  </div><!-- /wrap -->
+      <!-- RIGHT: task list -->
+      <div class="task-panel">
+        <div class="task-panel-header">
+          <span class="task-panel-title">the grind list 📋</span>
+          <span class="task-badge" id="task-badge">0 tasks</span>
+        </div>
+        <div class="task-input-row">
+          <input class="task-input" id="task-input" type="text"
+                 placeholder="add a task bestie…" maxlength="120">
+          <button class="task-add-btn" id="task-add-btn">+</button>
+        </div>
+        <!-- task items injected here by JS -->
+        <div class="task-list" id="task-list"></div>
+      </div>
 
-  <!-- ── SETTINGS MODAL ── -->
-  <div class="overlay" id="ovl">
+    </div>
+  </div><!-- /app-wrap -->
+
+
+  <!-- ── SETTINGS MODAL ───────────────────────────────────── -->
+  <div class="modal-overlay" id="settings-overlay">
     <div class="modal">
-      <div class="mtitle">settings.exe</div>
-      <button class="mx" id="mxBtn">✕</button>
+      <h2 class="modal-title">settings.exe</h2>
+      <button class="modal-close-btn" id="modal-close">✕</button>
 
-      <div class="sg">
-        <div class="sgl">session durations (minutes)</div>
+      <section class="setting-group">
+        <h3 class="setting-group-title">session durations (minutes)</h3>
 
-        <div class="sr">
-          <span class="sl">🍅 Pomodoro</span>
-          <div class="nc">
-            <button class="nb" data-k="pomodoro" data-d="-1">−</button>
-            <span class="nv" id="s-pomodoro">25</span>
-            <button class="nb" data-k="pomodoro" data-d="1">+</button>
+        <div class="setting-row">
+          <span class="setting-label">🍅 Pomodoro</span>
+          <div class="num-control">
+            <button class="num-btn" data-key="pomodoro" data-delta="-1">−</button>
+            <span class="num-value" id="s-pomodoro">25</span>
+            <button class="num-btn" data-key="pomodoro" data-delta="1">+</button>
           </div>
         </div>
-
-        <div class="sr">
-          <span class="sl">💤 Short break</span>
-          <div class="nc">
-            <button class="nb" data-k="short" data-d="-1">−</button>
-            <span class="nv" id="s-short">5</span>
-            <button class="nb" data-k="short" data-d="1">+</button>
+        <div class="setting-row">
+          <span class="setting-label">💤 Short break</span>
+          <div class="num-control">
+            <button class="num-btn" data-key="short" data-delta="-1">−</button>
+            <span class="num-value" id="s-short">5</span>
+            <button class="num-btn" data-key="short" data-delta="1">+</button>
           </div>
         </div>
-
-        <div class="sr">
-          <span class="sl">🛋 Long break</span>
-          <div class="nc">
-            <button class="nb" data-k="long" data-d="-1">−</button>
-            <span class="nv" id="s-long">15</span>
-            <button class="nb" data-k="long" data-d="1">+</button>
+        <div class="setting-row">
+          <span class="setting-label">🛋 Long break</span>
+          <div class="num-control">
+            <button class="num-btn" data-key="long" data-delta="-1">−</button>
+            <span class="num-value" id="s-long">15</span>
+            <button class="num-btn" data-key="long" data-delta="1">+</button>
           </div>
         </div>
-
-        <div class="sr">
-          <span class="sl">🔁 Long break every</span>
-          <div class="nc">
-            <button class="nb" data-k="interval" data-d="-1">−</button>
-            <span class="nv" id="s-interval">4</span>
-            <button class="nb" data-k="interval" data-d="1">+</button>
+        <div class="setting-row">
+          <span class="setting-label">🔁 Long break every</span>
+          <div class="num-control">
+            <button class="num-btn" data-key="interval" data-delta="-1">−</button>
+            <span class="num-value" id="s-interval">4</span>
+            <button class="num-btn" data-key="interval" data-delta="1">+</button>
           </div>
         </div>
-      </div><!-- /sg -->
+      </section>
 
-      <div class="sg">
-        <div class="sgl">vibes</div>
-        <div class="togrow">
-          <span class="togl">Auto-start next session</span>
-          <div class="tog" id="tog-auto"></div>
+      <section class="setting-group">
+        <h3 class="setting-group-title">behaviour</h3>
+        <div class="toggle-row">
+          <span class="toggle-label">Auto-start next session</span>
+          <div class="toggle-switch" id="tog-autostart"></div>
         </div>
-        <div class="togrow">
-          <span class="togl">Sound effects</span>
-          <div class="tog on" id="tog-sound"></div>
+        <div class="toggle-row">
+          <span class="toggle-label">Sound effects</span>
+          <div class="toggle-switch on" id="tog-sound"></div>
         </div>
-      </div>
+      </section>
 
-      <button class="sbtn" id="saveBtn">save it bestie ✦</button>
+      <button class="modal-save-btn" id="modal-save">save it bestie ✦</button>
     </div>
   </div>
 
-  <!-- toast notification -->
-  <div class="toast" id="toastEl"></div>
+  <!-- notification toast -->
+  <div class="toast" id="toast"></div>
 
   <script src="app.js"></script>
 </body>

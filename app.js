@@ -1,635 +1,902 @@
-/* ── QUOTES ─────────────────────────────────────────────────── */
-const Q = {
-  idle: [
-    "ready when you are bestie 👀",
-    "we're procrastinating together 🤝",
-    "the grind awaits... (no pressure tho)",
-    "this is your sign. start. NOW.",
-    "imagine actually being productive rn 💭",
-    "today we choose violence (on our task list)",
-    "the timer is ready. are you though? 🤔",
-  ],
-  pomStart: [
-    "ok bestie let's lock tf in 🔒",
-    "main character arc: activated ✨",
-    "time to pretend we have it together",
-    "channeling our inner that girl (allegedly) 💅",
-    "no thoughts, head empty, only grind 💀",
-    "slay or be slayed. choose wisely.",
-    "we're so cooked if we don't do this fr",
-    "it's giving productive. allegedly. 🎭",
-    "the delulu-to-reality pipeline is open",
-    "23 unread emails but make it fashion 💼",
-    "entering our locked-in era bestie",
-    "brain cells assemble!!! (please)",
-  ],
-  pomMid: [
-    "you're literally eating rn 👏",
-    "stay locked in bestie we're cookin",
-    "not you ACTUALLY doing the thing 😭",
-    "we're so in our bag rn no cap",
-    "the grind never sleeps (it should tho)",
-    "ur doing amazing sweetie fr fr 🌟",
-    "this is your villain origin story 😈",
-    "focus mode: engaged. brain cells: debatable.",
-  ],
-  pomEnd: [
-    "PERIODT. you ate that bestie 💅",
-    "omg you actually finished?? unhinged behavior",
-    "slay slay slay slay slay ✨✨✨",
-    "fr fr you just secured the bag 💼",
-    "we did it bestie. we survived. 🫂",
-    "not you being productive AND snatched 😤",
-    "the bar was low but you cleared it 🥂",
-    "your ancestors are crying (happy tears)",
-    "mission accomplished king/queen/legend 👑",
-    "W behavior. absolutely W.",
-    "that was a serve and a half bestie",
-  ],
-  shortStart: [
-    "ok go touch some grass or whatever 🌿",
-    "hydrate or diedrate bestie 💧",
-    "corpse mode: activated 💀",
-    "time to do nothing and justify it",
-    "this is your villain rest arc 😈",
-    "stare at the wall for 5 mins. heal.",
-    "snack run? snack run. 🍕",
-    "your braincells need a lil vacay too",
-  ],
-  shortEnd: [
-    "break's over bestie, cope and slay 💅",
-    "ok enough rotting, we rise 💪",
-    "back to the grind (we're sobbing but ok)",
-    "let's get this bread (idk why we do this)",
-    "rest arc is over. slay arc begins.",
-    "the grind is calling. unfortunately. 📞",
-  ],
-  longStart: [
-    "LONG BREAK ERA FULLY ACTIVATED 🎉",
-    "bestie you earned this. rest. rot. heal.",
-    "touch grass, drink water, eat food. in that order.",
-    "this is not procrastination this is RECOVERY 🧘",
-    "we are entering our full rest lore 💤",
-    "literally no notes. you did that. relax now.",
-  ],
-  longEnd: [
-    "ok legend, you've rested enough. allegedly.",
-    "back to work? (we're crying but it's fine)",
-    "rest arc complete. main character arc resuming.",
-    "we're fully recharged. (this is a lie but ok)",
-    "new session who dis 😤",
-  ],
-  taskDone: [
-    "SLAYED 💅 one less thing to panic about",
-    "check!! we're literally that girl rn",
-    "bestie ate and LEFT NO CRUMBS",
-    "ok that task never stood a chance fr",
-    "W ✓ secured. remaining Ls: decreasing.",
-  ],
+/* grind.app — app.js
+   all the logic. no framework. no drama.
+   organized top-to-bottom: state → config → audio → timer → tasks → ui */
+
+
+/* ─────────────────────────────────────────────────────────
+   RING CIRCUMFERENCE  (r=125, c = 2πr)
+   ───────────────────────────────────────────────────────── */
+const RING_CIRC = 2 * Math.PI * 125; // ~785.4
+
+
+/* ─────────────────────────────────────────────────────────
+   DEFAULT CONFIG  (overwritten by localStorage)
+   ───────────────────────────────────────────────────────── */
+const DEFAULT_CONFIG = {
+  pomodoro:  25,
+  short:      5,
+  long:      15,
+  interval:   4,  // pomodoros before a long break
+  autostart: false,
+  sound:     true,
 };
-const rnd = arr => arr[Math.floor(Math.random() * arr.length)];
 
-/* ── TICKER ──────────────────────────────────────────────────── */
-const TICKER_ITEMS = [
-  "✦ you got this bestie", "✦ no cap you're built for this",
-  "✦ slay the task list", "✦ stay hydrated king/queen",
-  "✦ we're so in our bag", "✦ this is your sign to focus",
-  "✦ 25 minutes and we're free", "✦ brain cells please show up",
-  "✦ main character energy only", "✦ we're literally cooking rn",
-  "✦ the delulu always wins", "✦ secure the bag bestie",
-  "✦ fr fr you're doing amazing", "✦ locked in. dialed in. cooked in.",
-  "✦ it's giving W behavior",
-];
-(function initTicker() {
-  const el = document.getElementById('tickerEl');
-  /* duplicate twice so the seamless loop works at any viewport width */
-  const row = TICKER_ITEMS.join('   ');
-  const s = document.createElement('span');
-  s.textContent = row + '   ' + row;   /* one seamless repeat */
-  el.appendChild(s);
-})();
 
-/* ── TICKER TOGGLE ───────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────
+   MODE METADATA  — colors, labels, quotes per session type
+   ───────────────────────────────────────────────────────── */
+const MODES = {
+  pomodoro: {
+    label:  'FOCUS TIME',
+    status: 'locked in bestie',
+    quotes: {
+      idle:  ['ready when you are bestie 👀', 'the tasks won\'t do themselves fr', 'we\'re about to cook 🍳'],
+      start: ['main character mode: activated ✦', 'locked. in. 🧠', 'this is your sign. let\'s go.', 'no thoughts, only tasks fr'],
+      mid:   ['halfway there bestie 💪', 'we\'re literally cooking rn', 'this is the delulu grind era', 'don\'t stop now king/queen'],
+      end:   ['W behavior tbh 🏆', 'slay! take your break bestie', 'you actually did that 💅', 'that was so real of you'],
+    },
+    // what the bg tints to during a pomodoro — subtle warm purple/red per theme
+    bgTints: {
+      phonebooth: 'rgba(120, 40, 200, 0.08)',
+      transit:    'rgba(30, 100, 200,  0.06)',
+      streetwear: 'rgba(200, 30, 30,   0.10)',
+      y2k:        'rgba(220, 60, 140,  0.07)',
+    },
+  },
+  short: {
+    label:  'SHORT BREAK',
+    status: 'sip that water 💧',
+    quotes: {
+      idle:  ['take a breath bestie 🌿', 'hydrate. you\'ve earned it.', 'touch grass (briefly)'],
+      start: ['short break go brrr 💨', 'stretch. seriously.', 'close your eyes for a sec ✨'],
+      mid:   ['still vibing 🌙', 'almost time to get back in it', 'recharge acquired'],
+      end:   ['break done. let\'s get it.', 'back to the grind bestie 🍅', 'rested? locked in? let\'s cook.'],
+    },
+    bgTints: {
+      phonebooth: 'rgba(40, 200, 140, 0.09)',
+      transit:    'rgba(60, 200, 160, 0.08)',
+      streetwear: 'rgba(40, 200, 80,  0.09)',
+      y2k:        'rgba(6,  180, 212, 0.08)',
+    },
+  },
+  long: {
+    label:  'LONG BREAK',
+    status: 'go touch some grass 🌿',
+    quotes: {
+      idle:  ['big break energy 🛋', 'you\'ve earned this one fr', 'rest is productive. it\'s science.'],
+      start: ['okay step AWAY from the screen 😭', 'long break arc begins now', 'we are so resting rn 💤'],
+      mid:   ['still resting. as it should be.', 'this break is giving 💆', 'recharge % going up'],
+      end:   ['back to world domination bestie 👑', 'rested era complete. let\'s cook.', 'okay we\'re ready fr fr'],
+    },
+    bgTints: {
+      phonebooth: 'rgba(40, 180, 240, 0.10)',
+      transit:    'rgba(80, 160, 255, 0.07)',
+      streetwear: 'rgba(60, 120, 255, 0.09)',
+      y2k:        'rgba(6,  182, 212, 0.09)',
+    },
+  },
+};
+
+
+/* ─────────────────────────────────────────────────────────
+   RING ACCENT COLORS per theme + mode
+   ───────────────────────────────────────────────────────── */
+const RING_COLORS = {
+  phonebooth: { pomodoro: '#c084fc', short: '#34d399', long: '#38bdf8' },
+  transit:    { pomodoro: '#38bdf8', short: '#4ade80', long: '#818cf8' },
+  streetwear: { pomodoro: '#ef4444', short: '#4ade80', long: '#60a5fa' },
+  y2k:        { pomodoro: '#ec4899', short: '#06b6d4', long: '#a78bfa' },
+};
+
+
+/* ─────────────────────────────────────────────────────────
+   APP STATE
+   ───────────────────────────────────────────────────────── */
+let config       = { ...DEFAULT_CONFIG };
+let tasks        = [];           // [{ id, text, done }]
+let focusedTaskId = null;        // id of the task user clicked to focus
+
+let mode         = 'pomodoro';   // 'pomodoro' | 'short' | 'long'
+let theme        = 'phonebooth';
+let chillMode    = false;
 let tickerVisible = true;
-(function initTickerToggle() {
+
+let isRunning    = false;
+let totalSeconds = 0;
+let leftSeconds  = 0;
+let timerStart   = null;         // Date.now() when timer last started
+let tickerHandle = null;
+
+let pomCount     = 0;            // how many pomodoros completed this cycle
+let editingTask  = null;         // id of task being inline-edited
+
+
+/* ─────────────────────────────────────────────────────────
+   DOM REFS  — grab everything once, use everywhere
+   ───────────────────────────────────────────────────────── */
+const $ = id => document.getElementById(id);
+
+const dom = {
+  modeBg:        $('mode-bg'),
+  starBg:        $('star-bg'),
+  tickerWrap:    $('ticker-wrap'),
+  tickerToggle:  $('ticker-toggle'),
+  tickerTrack:   $('ticker-track'),
+
+  modeTabs:      $('mode-tabs'),
+  themeSwitcher: $('theme-switcher'),
+  chillBtn:      $('chill-btn'),
+  settingsBtn:   $('settings-btn'),
+
+  ringProg:      $('ring-prog'),
+  ringGlow:      $('ring-glow'),
+  timeDigits:    $('time-digits'),
+  timeMode:      $('time-mode'),
+  timeStatus:    $('time-status'),
+
+  focusedChip:      $('focused-chip'),
+  focusedChipText:  $('focused-chip-text'),
+  focusedChipClear: $('focused-chip-clear'),
+
+  quoteText:   $('quote-text'),
+  quoteBox:    $('quote-box'),
+
+  playBtn:     $('play-btn'),
+  resetBtn:    $('reset-btn'),
+  skipBtn:     $('skip-btn'),
+  sessionDots: $('session-dots'),
+
+  taskInput:   $('task-input'),
+  taskAddBtn:  $('task-add-btn'),
+  taskList:    $('task-list'),
+  taskBadge:   $('task-badge'),
+
+  settingsOverlay: $('settings-overlay'),
+  modalClose:      $('modal-close'),
+  modalSave:       $('modal-save'),
+  togAutostart:    $('tog-autostart'),
+  togSound:        $('tog-sound'),
+  toast:           $('toast'),
+};
+
+
+/* ─────────────────────────────────────────────────────────
+   AUDIO  — all sounds baked in via Web Audio API
+   ───────────────────────────────────────────────────────── */
+const audioCtx = () => new (window.AudioContext || window.webkitAudioContext)();
+
+function playTone(type, freq, duration, gain = 0.18) {
+  if (!config.sound) return;
   try {
-    const saved = localStorage.getItem('ga3_ticker');
-    if (saved === 'hidden') tickerVisible = false;
-  } catch (e) {}
-  applyTickerState(false);
-  document.getElementById('tickerToggle').addEventListener('click', () => {
-    tickerVisible = !tickerVisible;
-    applyTickerState(true);
-    sfxClick();
-    try { localStorage.setItem('ga3_ticker', tickerVisible ? 'visible' : 'hidden'); } catch (e) {}
-  });
-})();
-function applyTickerState(animate) {
-  const wrap = document.getElementById('tickerWrap');
-  const btn  = document.getElementById('tickerToggle');
-  if (!animate) wrap.style.transition = 'none';
-  wrap.classList.toggle('hidden', !tickerVisible);
-  btn.textContent = tickerVisible ? 'ticker ✦' : 'ticker ○';
-  btn.title = tickerVisible ? 'hide ticker' : 'show ticker';
-  if (!animate) void wrap.offsetWidth, wrap.style.transition = '';
+    const ctx = audioCtx();
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.connect(env); env.connect(ctx.destination);
+    osc.type = type; osc.frequency.value = freq;
+    env.gain.setValueAtTime(gain, ctx.currentTime);
+    env.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.start(); osc.stop(ctx.currentTime + duration);
+  } catch (e) { /* audio blocked, no worries */ }
 }
 
-/* ── STARS ───────────────────────────────────────────────────── */
-function makeStars() {
-  const bg = document.getElementById('starbg');
-  while (bg.firstChild) bg.removeChild(bg.firstChild);
-  const chars = ['✦', '✧', '⊹', '×', '◦', '·', '⋆', '⊛'];
-  for (let i = 0; i < 28; i++) {
-    const s = document.createElement('div');
-    s.className = 'star';
-    s.textContent = chars[i % chars.length];
-    s.style.cssText = `left:${Math.random() * 100}%;top:${10 + Math.random() * 90}%;--dur:${6 + Math.random() * 12}s;--d:${Math.random() * 10}s;font-size:${7 + Math.random() * 13}px`;
-    bg.appendChild(s);
-  }
-}
-makeStars();
-
-/* ── RING CONSTANTS ──────────────────────────────────────────── */
-const CIRC = 2 * Math.PI * 125;
-document.getElementById('rprog').style.strokeDasharray = CIRC;
-document.getElementById('rglow').style.strokeDasharray = CIRC;
-
-/* ── APP STATE ───────────────────────────────────────────────── */
-let cfg = { pomodoro: 25, short: 5, long: 15, interval: 4, autoStart: false, sound: true };
-let tmp = {};
-let tasks = [];
-let mode = 'pomodoro';
-let totalS = 25 * 60, remS = 25 * 60;
-let running = false, startT = null, elap = 0, tid = null;
-let donePomos = 0;
-let curTheme = 'phonebooth';
-
-/* ── PERSISTENCE ─────────────────────────────────────────────── */
-function loadData() {
+function playTwoTone(freq1, freq2, type = 'sine') {
+  if (!config.sound) return;
   try {
-    const c = localStorage.getItem('ga3_cfg');   if (c) cfg   = { ...cfg,   ...JSON.parse(c) };
-    const t = localStorage.getItem('ga3_tasks');  if (t) tasks = JSON.parse(t);
-    const th = localStorage.getItem('ga3_theme'); if (th) applyTheme(th, true);
-  } catch (e) {}
-  totalS = cfg[mode] * 60;
-  remS   = totalS;
-}
-function saveData() {
-  try {
-    localStorage.setItem('ga3_cfg',   JSON.stringify(cfg));
-    localStorage.setItem('ga3_tasks', JSON.stringify(tasks));
-    localStorage.setItem('ga3_theme', curTheme);
-  } catch (e) {}
-}
-
-/* ── THEME ───────────────────────────────────────────────────── */
-function applyTheme(t, silent) {
-  curTheme = t;
-  document.documentElement.setAttribute('data-theme', t);
-  document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  if (!silent) { makeStars(); saveData(); }
-}
-
-/* ── AUDIO ENGINE ────────────────────────────────────────────── */
-let ac;
-function getAC() {
-  if (!ac || ac.state === 'closed') ac = new AudioContext();
-  if (ac.state === 'suspended')     ac.resume();
-  return ac;
-}
-
-/* tiny square blip – every button press */
-function sfxClick() {
-  if (!cfg.sound) return;
-  try {
-    const a = getAC(), o = a.createOscillator(), g = a.createGain();
-    o.connect(g); g.connect(a.destination);
-    o.type = 'square'; o.frequency.value = 880;
-    g.gain.setValueAtTime(.07, a.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .07);
-    o.start(); o.stop(a.currentTime + .07);
+    const ctx = audioCtx();
+    const mkOsc = (freq, startAt) => {
+      const osc = ctx.createOscillator();
+      const env = ctx.createGain();
+      osc.connect(env); env.connect(ctx.destination);
+      osc.type = type; osc.frequency.value = freq;
+      env.gain.setValueAtTime(0.001, startAt);
+      env.gain.linearRampToValueAtTime(0.16, startAt + 0.02);
+      env.gain.exponentialRampToValueAtTime(0.001, startAt + 0.14);
+      osc.start(startAt); osc.stop(startAt + 0.15);
+    };
+    mkOsc(freq1, ctx.currentTime);
+    mkOsc(freq2, ctx.currentTime + 0.11);
   } catch (e) {}
 }
 
-/* punchy sine pop – play button (start) */
-function sfxPlay() {
-  if (!cfg.sound) return;
+function playSweep(freqStart, freqEnd) {
+  if (!config.sound) return;
   try {
-    const a = getAC();
-    // rising two-tone pop
-    [330, 523].forEach((f, i) => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.connect(g); g.connect(a.destination);
-      o.type = 'sine'; o.frequency.value = f;
-      const t = a.currentTime + i * .07;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(.18, t + .02);
-      g.gain.exponentialRampToValueAtTime(.001, t + .18);
-      o.start(t); o.stop(t + .18);
-    });
+    const ctx = audioCtx();
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.connect(env); env.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freqStart, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(freqEnd, ctx.currentTime + 0.22);
+    env.gain.setValueAtTime(0.14, ctx.currentTime);
+    env.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+    osc.start(); osc.stop(ctx.currentTime + 0.26);
   } catch (e) {}
 }
 
-/* soft descending click – pause button */
-function sfxPause() {
-  if (!cfg.sound) return;
+function playFanfare() {
+  if (!config.sound) return;
+  const notes = [523, 587, 659, 698, 784, 880, 1047];
+  notes.forEach((freq, i) => playTone('square', freq, 0.18, 0.12 - i * 0.01));
+}
+
+const sfx = {
+  click:    () => playTone('square', 880, 0.07, 0.09),
+  play:     () => playTwoTone(330, 523),
+  pause:    () => playTwoTone(523, 330),
+  skip:     () => playSweep(400, 800),
+  complete: () => playFanfare(),
+  breakEnd: () => { [660, 587, 523, 440].forEach((f, i) => playTone('sine', f, 0.18, 0.15)); },
+  taskDone: () => playTwoTone(523, 784),
+};
+
+
+/* ─────────────────────────────────────────────────────────
+   STORAGE  — thin wrappers, never throws
+   ───────────────────────────────────────────────────────── */
+function saveToStorage(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+function loadFromStorage(key, fallback) {
   try {
-    const a = getAC();
-    [523, 330].forEach((f, i) => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.connect(g); g.connect(a.destination);
-      o.type = 'sine'; o.frequency.value = f;
-      const t = a.currentTime + i * .07;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(.14, t + .02);
-      g.gain.exponentialRampToValueAtTime(.001, t + .16);
-      o.start(t); o.stop(t + .16);
-    });
-  } catch (e) {}
+    const raw = localStorage.getItem(key);
+    return raw !== null ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
 }
 
-/* ascending whoosh – skip / mode switch */
-function sfxWoosh() {
-  if (!cfg.sound) return;
-  try {
-    const a = getAC(), o = a.createOscillator(), g = a.createGain();
-    o.connect(g); g.connect(a.destination);
-    o.type = 'sine'; o.frequency.value = 400;
-    o.frequency.linearRampToValueAtTime(800, a.currentTime + .15);
-    g.gain.setValueAtTime(.08, a.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .2);
-    o.start(); o.stop(a.currentTime + .2);
-  } catch (e) {}
-}
 
-/* loud fanfare + noise – pomodoro complete */
-function sfxComplete() {
-  if (!cfg.sound) return;
-  try {
-    const a = getAC();
-    [[523,.00,.32],[659,.15,.32],[784,.30,.32],[1047,.45,.55],
-     [784,.65,.22],[1047,.75,.22],[1319,.88,.75]].forEach(([f, d, l]) => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.connect(g); g.connect(a.destination);
-      o.type = 'square'; o.frequency.value = f;
-      const t = a.currentTime + d;
-      g.gain.setValueAtTime(0, t);
-      g.gain.linearRampToValueAtTime(.35, t + .025);
-      g.gain.exponentialRampToValueAtTime(.001, t + l);
-      o.start(t); o.stop(t + l);
-    });
-    // noise burst
-    const buf = a.createBuffer(1, a.sampleRate * .5, a.sampleRate);
-    const dat = buf.getChannelData(0);
-    for (let i = 0; i < dat.length; i++) dat[i] = (Math.random() * 2 - 1) * .13;
-    const src = a.createBufferSource(), gn = a.createGain();
-    src.buffer = buf; src.connect(gn); gn.connect(a.destination);
-    gn.gain.setValueAtTime(.18, a.currentTime);
-    gn.gain.exponentialRampToValueAtTime(.001, a.currentTime + .5);
-    src.start();
-  } catch (e) {}
-}
+/* ─────────────────────────────────────────────────────────
+   TIMER CORE
+   ───────────────────────────────────────────────────────── */
 
-/* descending "uh oh" – break over */
-function sfxBreakEnd() {
-  if (!cfg.sound) return;
-  try {
-    const a = getAC();
-    [660, 550, 440, 330].forEach((f, i) => {
-      const o = a.createOscillator(), g = a.createGain();
-      o.connect(g); g.connect(a.destination);
-      o.type = 'sine'; o.frequency.value = f;
-      const t = a.currentTime + i * .15;
-      g.gain.setValueAtTime(.1, t);
-      g.gain.exponentialRampToValueAtTime(.001, t + .28);
-      o.start(t); o.stop(t + .28);
-    });
-  } catch (e) {}
-}
-
-/* quick rising ping – task checked off */
-function sfxTaskDone() {
-  if (!cfg.sound) return;
-  try {
-    const a = getAC(), o = a.createOscillator(), g = a.createGain();
-    o.connect(g); g.connect(a.destination);
-    o.type = 'sine'; o.frequency.value = 523;
-    o.frequency.linearRampToValueAtTime(784, a.currentTime + .12);
-    g.gain.setValueAtTime(.08, a.currentTime);
-    g.gain.exponentialRampToValueAtTime(.001, a.currentTime + .25);
-    o.start(); o.stop(a.currentTime + .25);
-  } catch (e) {}
-}
-
-/* ── DISPLAY ──────────────────────────────────────────────────── */
-const MODE_LABEL = { pomodoro: 'FOCUS TIME', short: 'SHORT BREAK', long: 'LONG BREAK' };
-
-function fmt(s) {
-  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
-}
-
-function redraw() {
-  document.getElementById('tdisp').textContent = fmt(remS);
-  document.title = `${fmt(remS)} — grind.app`;
-  const off = CIRC * (1 - remS / totalS);
-  document.getElementById('rprog').style.strokeDashoffset = off;
-  document.getElementById('rglow').style.strokeDashoffset = off;
-  const st = document.getElementById('tstat');
-  if (running) {
-    st.textContent = '● RUNNING'; st.style.animation = 'blk 1s steps(1) infinite';
-  } else if (remS < totalS) {
-    st.textContent = '❚❚ PAUSED'; st.style.animation = '';
-  } else {
-    st.textContent = '\u00a0'; st.style.animation = '';
+function startTimer() {
+  if (isRunning) return;
+  isRunning  = true;
+  timerStart = Date.now() - ((totalSeconds - leftSeconds) * 1000);
+  tickerHandle = setInterval(tickTimer, 200);
+  updatePlayButton();
+  updateTimerStatus();
+  if (leftSeconds === totalSeconds) {
+    setQuote(getQuoteFor('start'));
   }
 }
 
-/* ── TIMER LOGIC ─────────────────────────────────────────────── */
-function tick() {
-  remS = Math.max(0, totalS - Math.floor((Date.now() - startT + elap) / 1000));
-  redraw();
-  if (remS === 0) { clearInterval(tid); tid = null; running = false; onEnd(); }
-}
-
-function toggleTimer() {
-  if (running) {
-    elap += Date.now() - startT;
-    clearInterval(tid); tid = null;
-    running = false;
-    sfxPause();
-    setPlayIcon(false); redraw();
-    setQuote('idle');
-  } else {
-    startT = Date.now();
-    tid = setInterval(tick, 200);
-    running = true;
-    sfxPlay();
-    setPlayIcon(true); redraw();
-    setQuote(mode === 'pomodoro' ? 'pomStart' : mode === 'short' ? 'shortStart' : 'longStart');
-  }
+function pauseTimer() {
+  if (!isRunning) return;
+  isRunning = false;
+  clearInterval(tickerHandle);
+  updatePlayButton();
+  updateTimerStatus();
 }
 
 function resetTimer() {
-  if (tid) { clearInterval(tid); tid = null; }
-  running = false; elap = 0; remS = totalS;
-  sfxClick(); setPlayIcon(false); redraw(); setQuote('idle');
+  pauseTimer();
+  leftSeconds = totalSeconds;
+  updateTimerDisplay();
+  updateRingProgress();
+  dom.timeStatus.textContent = '';
+  setQuote(getQuoteFor('idle'));
 }
 
-function skipSession() {
-  if (tid) { clearInterval(tid); tid = null; }
-  running = false; elap = 0;
-  sfxWoosh(); advance();
+function skipToNextSession() {
+  pauseTimer();
+  advanceMode();
 }
 
-function setPlayIcon(playing) {
-  document.getElementById('playBtn').textContent = playing ? '⏸' : '▶';
+// called every 200ms — uses Date.now() delta to stay accurate
+function tickTimer() {
+  const elapsed = Math.floor((Date.now() - timerStart) / 1000);
+  leftSeconds   = Math.max(0, totalSeconds - elapsed);
+
+  updateTimerDisplay();
+  updateRingProgress();
+
+  // mid-session quote trigger
+  if (leftSeconds === Math.floor(totalSeconds / 2)) {
+    setQuote(getQuoteFor('mid'));
+  }
+
+  if (leftSeconds <= 0) {
+    onSessionComplete();
+  }
 }
 
-function onEnd() {
-  setPlayIcon(false);
+function onSessionComplete() {
+  clearInterval(tickerHandle);
+  isRunning = false;
+
+  setQuote(getQuoteFor('end'));
+  if (mode === 'pomodoro') { pomCount++; sfx.complete(); spawnBurstParticles(); }
+  else                      { sfx.breakEnd(); }
+
+  showToast(mode === 'pomodoro' ? '🍅 pomodoro done! take a break bestie' : '⏰ break over! back to the grind');
+
+  advanceMode();
+
+  if (config.autostart) startTimer();
+}
+
+// moves to the next logical mode after a session ends
+function advanceMode() {
   if (mode === 'pomodoro') {
-    donePomos++; renderDots();
-    sfxComplete(); doBurst();
-    setQuote('pomEnd');
-    toast('🎉 session complete bestie!');
+    const nextMode = (pomCount % config.interval === 0 && pomCount > 0) ? 'long' : 'short';
+    switchMode(nextMode);
   } else {
-    sfxBreakEnd(); doBurst();
-    setQuote(mode === 'long' ? 'longEnd' : 'shortEnd');
-    toast('⚡ break over — back to the grind');
+    switchMode('pomodoro');
   }
-  if (cfg.autoStart) {
-    setTimeout(() => { advance(); setTimeout(toggleTimer, 400); }, 1000);
-  } else {
-    advance();
+  updateSessionDots();
+}
+
+function switchMode(newMode) {
+  mode        = newMode;
+  totalSeconds = config[newMode] * 60;
+  leftSeconds  = totalSeconds;
+  isRunning    = false;
+  clearInterval(tickerHandle);
+
+  updateTimerDisplay();
+  updateRingProgress();
+  updateModeUI();
+  setQuote(getQuoteFor('idle'));
+  dom.timeStatus.textContent = '';
+  updatePlayButton();
+  applyModeTint();
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   TASKS
+   ───────────────────────────────────────────────────────── */
+
+function addTask(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  tasks.unshift({ id: Date.now(), text: trimmed, done: false });
+  saveToStorage('ga3_tasks', tasks);
+  renderTasks();
+  sfx.click();
+}
+
+function toggleTaskDone(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  task.done = !task.done;
+  if (task.done) {
+    sfx.taskDone();
+    if (focusedTaskId === id) clearFocusedTask();
   }
+  saveToStorage('ga3_tasks', tasks);
+  renderTasks();
 }
 
-function advance() {
-  if (mode === 'pomodoro') {
-    mode = (donePomos > 0 && donePomos % cfg.interval === 0) ? 'long' : 'short';
-  } else {
-    mode = 'pomodoro';
-  }
-  document.querySelectorAll('.mb').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
-  applyMode(); sfxWoosh();
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  if (focusedTaskId === id) clearFocusedTask();
+  saveToStorage('ga3_tasks', tasks);
+  renderTasks();
+  sfx.click();
 }
 
-function switchMode(m) {
-  if (running) { clearInterval(tid); tid = null; running = false; elap = 0; setPlayIcon(false); }
-  mode = m;
-  document.querySelectorAll('.mb').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
-  applyMode(); setQuote('idle'); sfxWoosh();
+function editTaskText(id, newText) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const trimmed = newText.trim();
+  if (!trimmed) { deleteTask(id); return; }
+  task.text = trimmed;
+  if (focusedTaskId === id) dom.focusedChipText.textContent = trimmed;
+  saveToStorage('ga3_tasks', tasks);
 }
 
-function applyMode() {
-  totalS = cfg[mode] * 60; remS = totalS; elap = 0;
-  document.getElementById('tlbl').textContent = MODE_LABEL[mode];
-  redraw();
+// set a task as the "focused" one — shown in the chip above the timer
+function focusTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task || task.done) return;
+
+  focusedTaskId = (focusedTaskId === id) ? null : id;  // toggle
+  saveToStorage('ga3_focus', focusedTaskId);
+  renderTasks();
+  updateFocusedChip();
+  sfx.click();
 }
 
-/* ── QUOTES ──────────────────────────────────────────────────── */
-function setQuote(cat) {
-  const el = document.getElementById('qtxt');
-  const box = document.getElementById('qbox');
-  el.textContent = rnd(Q[cat]);
-  box.classList.remove('qf');
-  void box.offsetWidth;
-  box.classList.add('qf');
+function clearFocusedTask() {
+  focusedTaskId = null;
+  saveToStorage('ga3_focus', null);
+  renderTasks();
+  updateFocusedChip();
 }
 
-/* ── BURST PARTICLES ─────────────────────────────────────────── */
-function doBurst() {
-  const em = ['✨','🎉','💅','🔥','⭐','💫','🌟','🎊','✦','🏆'];
-  const cx = window.innerWidth / 2, cy = window.innerHeight * .4;
-  for (let i = 0; i < 10; i++) {
-    const el = document.createElement('div');
-    el.className = 'burst';
-    el.textContent = em[i % em.length];
-    el.style.left = (cx + (Math.random() - .5) * 280) + 'px';
-    el.style.top  = (cy + (Math.random() - .5) * 180) + 'px';
-    el.style.animationDelay = (Math.random() * .3) + 's';
-    document.body.appendChild(el);
-    setTimeout(() => { if (el.parentNode) el.parentNode.removeChild(el); }, 1300);
-  }
-}
 
-/* ── SESSION DOTS ────────────────────────────────────────────── */
-function renderDots() {
-  const wrap = document.getElementById('dotsEl');
-  while (wrap.firstChild) wrap.removeChild(wrap.firstChild);
-  const n = cfg.interval, filled = donePomos % n;
-  for (let i = 0; i < n; i++) {
-    const d = document.createElement('div');
-    d.className = 'dot' + (i < filled ? ' on' : '');
-    wrap.appendChild(d);
-  }
-}
+/* ─────────────────────────────────────────────────────────
+   RENDER: TASKS
+   ───────────────────────────────────────────────────────── */
 
-/* ── TASKS ───────────────────────────────────────────────────── */
 function renderTasks() {
-  const list = document.getElementById('tlist');
-  while (list.firstChild) list.removeChild(list.firstChild);
-  document.getElementById('tcnt').textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+  const list = dom.taskList;
+  list.innerHTML = '';
 
   if (tasks.length === 0) {
-    const e = document.createElement('div');
-    e.className = 'tempty';
-    e.innerHTML = 'no tasks yet bestie<br>add something to the grind list<br><br>✦ the queue is empty ✦';
-    list.appendChild(e);
+    const empty = document.createElement('div');
+    empty.className = 'task-empty';
+    empty.innerHTML = 'no tasks yet bestie ✦<br><small>add something above to grind on</small>';
+    list.appendChild(empty);
+    dom.taskBadge.textContent = '0 tasks';
     return;
   }
 
-  tasks.forEach((task, i) => {
-    const item = document.createElement('div');
-    item.className = 'titem' + (task.done ? ' done' : '');
+  const remaining = tasks.filter(t => !t.done).length;
+  dom.taskBadge.textContent = `${remaining} left`;
 
-    const chk = document.createElement('div');
-    chk.className = 'tchk';
-    chk.textContent = task.done ? '✓' : '';
-    chk.addEventListener('click', () => toggleTask(i));
-
-    const txt = document.createElement('div');
-    txt.className = 'ttxt';
-    txt.textContent = task.text;
-
-    const acts = document.createElement('div');
-    acts.className = 'tacts';
-
-    const eb = document.createElement('button');
-    eb.className = 'ta'; eb.title = 'edit'; eb.textContent = '✏';
-    eb.addEventListener('click', () => editTask(i, txt));
-
-    const db = document.createElement('button');
-    db.className = 'ta del'; db.title = 'delete'; db.textContent = '🗑';
-    db.addEventListener('click', () => deleteTask(i));
-
-    acts.appendChild(eb);
-    acts.appendChild(db);
-    item.appendChild(chk);
-    item.appendChild(txt);
-    item.appendChild(acts);
+  tasks.forEach(task => {
+    const item = buildTaskElement(task);
     list.appendChild(item);
   });
 }
 
-function addTask() {
-  const inp = document.getElementById('tinput');
-  const v = inp.value.trim();
-  if (!v) return;
-  tasks.unshift({ text: v, done: false });
-  inp.value = '';
-  saveData(); renderTasks(); sfxClick();
-  if (Math.random() < .35) toast(rnd(Q.pomMid));
+function buildTaskElement(task) {
+  const item = document.createElement('div');
+  item.className = 'task-item' + (task.done ? ' done' : '') + (task.id === focusedTaskId ? ' focused' : '');
+  item.dataset.id = task.id;
+
+  // checkbox
+  const check = document.createElement('div');
+  check.className = 'task-check';
+  check.textContent = task.done ? '✓' : '';
+  check.title = task.done ? 'mark undone' : 'mark done';
+  check.addEventListener('click', e => { e.stopPropagation(); toggleTaskDone(task.id); });
+
+  // text (inline-editable on double-click)
+  const text = document.createElement('div');
+  text.className = 'task-text';
+  text.textContent = task.text;
+  text.setAttribute('tabindex', '0');
+  text.addEventListener('dblclick', () => startInlineEdit(task.id, text));
+
+  // actions (focus icon + delete)
+  const actions = document.createElement('div');
+  actions.className = 'task-actions';
+
+  const focusBtn = document.createElement('button');
+  focusBtn.className = 'task-action';
+  focusBtn.title = task.id === focusedTaskId ? 'clear focus' : 'focus on this';
+  focusBtn.textContent = task.id === focusedTaskId ? '★' : '☆';
+  focusBtn.style.color = task.id === focusedTaskId ? 'var(--ring)' : '';
+  focusBtn.addEventListener('click', e => { e.stopPropagation(); focusTask(task.id); });
+
+  const deleteBtn = document.createElement('button');
+  deleteBtn.className = 'task-action delete';
+  deleteBtn.title = 'delete';
+  deleteBtn.textContent = '×';
+  deleteBtn.addEventListener('click', e => { e.stopPropagation(); deleteTask(task.id); });
+
+  actions.appendChild(focusBtn);
+  actions.appendChild(deleteBtn);
+
+  // clicking the row (not check/buttons) focuses the task
+  item.addEventListener('click', () => {
+    if (!task.done) focusTask(task.id);
+  });
+
+  item.appendChild(check);
+  item.appendChild(text);
+  item.appendChild(actions);
+  return item;
 }
 
-function toggleTask(i) {
-  tasks[i].done = !tasks[i].done;
-  saveData(); renderTasks(); sfxTaskDone();
-  if (tasks[i].done) toast(rnd(Q.taskDone));
+function startInlineEdit(id, textEl) {
+  editingTask = id;
+  textEl.setAttribute('contenteditable', 'true');
+  textEl.focus();
+  // select all
+  const range = document.createRange();
+  range.selectNodeContents(textEl);
+  window.getSelection().removeAllRanges();
+  window.getSelection().addRange(range);
+
+  function commit() {
+    textEl.removeAttribute('contenteditable');
+    editTaskText(id, textEl.textContent);
+    editingTask = null;
+  }
+  textEl.addEventListener('blur',    commit, { once: true });
+  textEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); textEl.blur(); }
+    if (e.key === 'Escape') { textEl.textContent = tasks.find(t => t.id === id)?.text || ''; textEl.blur(); }
+  }, { once: true });
 }
 
-function editTask(i, txtEl) {
-  txtEl.contentEditable = 'true'; txtEl.focus();
-  const r = document.createRange();
-  r.selectNodeContents(txtEl); r.collapse(false);
-  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
 
-  const fin = () => {
-    txtEl.contentEditable = 'false';
-    const nv = txtEl.textContent.trim();
-    if (nv) tasks[i].text = nv;
-    txtEl.removeEventListener('blur', fin);
-    txtEl.removeEventListener('keydown', kh);
-    saveData(); renderTasks();
-  };
-  const kh = e => { if (e.key === 'Enter') { e.preventDefault(); fin(); } };
-  txtEl.addEventListener('blur', fin);
-  txtEl.addEventListener('keydown', kh);
+/* ─────────────────────────────────────────────────────────
+   RENDER: TIMER UI
+   ───────────────────────────────────────────────────────── */
+
+function updateTimerDisplay() {
+  const m = String(Math.floor(leftSeconds / 60)).padStart(2, '0');
+  const s = String(leftSeconds % 60).padStart(2, '0');
+  dom.timeDigits.textContent = `${m}:${s}`;
 }
 
-function deleteTask(i) {
-  tasks.splice(i, 1);
-  saveData(); renderTasks(); sfxClick();
+function updateRingProgress() {
+  const pct    = totalSeconds > 0 ? leftSeconds / totalSeconds : 1;
+  const offset = RING_CIRC * (1 - pct);
+  dom.ringProg.style.strokeDashoffset = offset;
+  dom.ringGlow.style.strokeDashoffset = offset;
 }
 
-/* ── SETTINGS ────────────────────────────────────────────────── */
-const LIMITS = { pomodoro: [1, 90], short: [1, 30], long: [1, 60], interval: [1, 10] };
+function updatePlayButton() {
+  dom.playBtn.textContent = isRunning ? '⏸' : '▶';
+}
+
+function updateTimerStatus() {
+  dom.timeStatus.textContent = isRunning ? MODES[mode].status : '';
+}
+
+function updateModeUI() {
+  dom.timeMode.textContent = MODES[mode].label;
+
+  // sync mode tab highlight
+  dom.modeTabs.querySelectorAll('.mode-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+}
+
+function updateSessionDots() {
+  dom.sessionDots.innerHTML = '';
+  const total = config.interval;
+  for (let i = 0; i < total; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'session-dot' + (i < pomCount % total ? ' done' : '');
+    dom.sessionDots.appendChild(dot);
+  }
+}
+
+function updateFocusedChip() {
+  const task = tasks.find(t => t.id === focusedTaskId);
+  if (task) {
+    dom.focusedChip.style.display = 'flex';
+    dom.focusedChipText.textContent = task.text;
+  } else {
+    dom.focusedChip.style.display = 'none';
+    dom.focusedChipText.textContent = '';
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   QUOTES
+   ───────────────────────────────────────────────────────── */
+
+function getQuoteFor(phase) {
+  const pool = MODES[mode].quotes[phase];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function setQuote(text) {
+  dom.quoteText.textContent = text;
+  dom.quoteBox.classList.remove('quote-flash');
+  void dom.quoteBox.offsetWidth;  // force reflow so animation re-triggers
+  dom.quoteBox.classList.add('quote-flash');
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   THEMES & MODE TINTS
+   ───────────────────────────────────────────────────────── */
+
+function applyTheme(newTheme) {
+  theme = newTheme;
+  document.documentElement.dataset.theme = theme;
+
+  // sync theme button active state
+  dom.themeSwitcher.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === theme);
+  });
+
+  applyModeTint();
+  saveToStorage('ga3_theme', theme);
+}
+
+// sets the ring color + full-page tint based on current mode + theme
+function applyModeTint() {
+  const ringColor = RING_COLORS[theme][mode];
+  const tintColor = MODES[mode].bgTints[theme];
+
+  // ring stroke + glow CSS vars
+  document.documentElement.style.setProperty('--ring',      ringColor);
+  document.documentElement.style.setProperty('--ring-glow', hexToRgba(ringColor, 0.22));
+
+  // ring element strokes
+  dom.ringProg.style.stroke = ringColor;
+  dom.ringGlow.style.stroke = ringColor;
+
+  // full-page mode tint
+  dom.modeBg.style.background = tintColor || 'transparent';
+
+  // keep the ring dasharray set
+  dom.ringProg.style.strokeDasharray = RING_CIRC;
+  dom.ringGlow.style.strokeDasharray = RING_CIRC;
+}
+
+// util: hex color → rgba string for glow vars
+function hexToRgba(hex, alpha) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   CHILL MODE  — kills stars, ticker, and glow animations
+   ───────────────────────────────────────────────────────── */
+
+function applyChillMode(chill) {
+  chillMode = chill;
+  document.documentElement.classList.toggle('chill', chill);
+  saveToStorage('ga3_chill', chill);
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   TICKER TAPE
+   ───────────────────────────────────────────────────────── */
+const TICKER_PHRASES = [
+  '✦ you got this bestie',     '✦ no cap you\'re built for this',
+  '✦ slay the task list',      '✦ stay hydrated king/queen',
+  '✦ we\'re so in our bag',    '✦ this is your sign to focus',
+  '✦ 25 minutes and we\'re free', '✦ brain cells please show up',
+  '✦ main character energy only', '✦ we\'re literally cooking rn',
+  '✦ the delulu always wins',  '✦ secure the bag bestie',
+  '✦ fr fr you\'re doing amazing', '✦ locked in. dialed in. cooked in.',
+  '✦ it\'s giving W behavior',
+];
+
+function initTicker() {
+  // duplicate the row so the CSS loop is seamless
+  const row  = TICKER_PHRASES.join('   ');
+  const span = document.createElement('span');
+  span.textContent = row + '   ' + row;
+  dom.tickerTrack.appendChild(span);
+}
+
+function applyTickerState(animate) {
+  if (!animate) dom.tickerWrap.style.transition = 'none';
+  dom.tickerWrap.classList.toggle('hidden', !tickerVisible);
+  dom.tickerToggle.textContent = tickerVisible ? 'ticker ✦' : 'ticker ○';
+  dom.tickerToggle.title       = tickerVisible ? 'hide ticker' : 'show ticker';
+  if (!animate) { void dom.tickerWrap.offsetWidth; dom.tickerWrap.style.transition = ''; }
+  saveToStorage('ga3_ticker', tickerVisible);
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   STAR PARTICLES  — spawned once on load
+   ───────────────────────────────────────────────────────── */
+
+function spawnStars(count = 16) {
+  for (let i = 0; i < count; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.textContent = '✦';
+    star.style.cssText = `
+      left: ${Math.random() * 100}%;
+      font-size: ${0.6 + Math.random() * 0.9}rem;
+      --dur:   ${7 + Math.random() * 10}s;
+      --delay: ${-Math.random() * 15}s;
+    `;
+    dom.starBg.appendChild(star);
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   BURST PARTICLES  — emoji confetti on session complete
+   ───────────────────────────────────────────────────────── */
+
+const BURST_EMOJIS = ['🍅', '✦', '🏆', '💅', '⚡', '🎉', '✨'];
+
+function spawnBurstParticles() {
+  if (chillMode) return;  // skip in chill mode
+  for (let i = 0; i < 9; i++) {
+    const el = document.createElement('div');
+    el.className = 'burst-particle';
+    el.textContent = BURST_EMOJIS[Math.floor(Math.random() * BURST_EMOJIS.length)];
+    el.style.left = `${25 + Math.random() * 50}%`;
+    el.style.top  = `${30 + Math.random() * 30}%`;
+    el.style.animationDelay = `${Math.random() * 0.4}s`;
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   TOAST
+   ───────────────────────────────────────────────────────── */
+let toastTimer = null;
+
+function showToast(message) {
+  clearTimeout(toastTimer);
+  dom.toast.textContent = message;
+  dom.toast.classList.add('visible');
+  toastTimer = setTimeout(() => dom.toast.classList.remove('visible'), 3200);
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   SETTINGS MODAL
+   ───────────────────────────────────────────────────────── */
 
 function openSettings() {
-  tmp = { ...cfg };
-  ['pomodoro', 'short', 'long', 'interval'].forEach(k => {
-    document.getElementById(`s-${k}`).textContent = tmp[k];
+  // populate fields from current config
+  ['pomodoro', 'short', 'long', 'interval'].forEach(key => {
+    document.getElementById(`s-${key}`).textContent = config[key];
   });
-  document.getElementById('tog-auto').classList.toggle('on',   tmp.autoStart);
-  document.getElementById('tog-sound').classList.toggle('on',  tmp.sound);
-  document.getElementById('ovl').classList.add('open');
-  sfxClick();
+  dom.togAutostart.classList.toggle('on', config.autostart);
+  dom.togSound.classList.toggle('on', config.sound);
+  dom.settingsOverlay.classList.add('open');
 }
+
 function closeSettings() {
-  document.getElementById('ovl').classList.remove('open');
-  sfxClick();
+  dom.settingsOverlay.classList.remove('open');
 }
-function adjSetting(k, d) {
-  const [mn, mx] = LIMITS[k];
-  tmp[k] = Math.min(mx, Math.max(mn, tmp[k] + d));
-  document.getElementById(`s-${k}`).textContent = tmp[k];
-  sfxClick();
-}
-function togSetting(k) {
-  tmp[k] = !tmp[k];
-  document.getElementById(k === 'autoStart' ? 'tog-auto' : 'tog-sound').classList.toggle('on', tmp[k]);
-  sfxClick();
-}
+
 function saveSettings() {
-  cfg = { ...tmp }; saveData();
-  if (!running) { totalS = cfg[mode] * 60; remS = totalS; elap = 0; redraw(); }
-  renderDots(); closeSettings();
-  toast('settings saved bestie ✦');
+  ['pomodoro', 'short', 'long', 'interval'].forEach(key => {
+    config[key] = parseInt(document.getElementById(`s-${key}`).textContent) || DEFAULT_CONFIG[key];
+  });
+  config.autostart = dom.togAutostart.classList.contains('on');
+  config.sound     = dom.togSound.classList.contains('on');
+  saveToStorage('ga3_cfg', config);
+
+  // reset timer to new duration
+  totalSeconds = config[mode] * 60;
+  leftSeconds  = totalSeconds;
+  pauseTimer();
+  updateTimerDisplay();
+  updateRingProgress();
+  updateSessionDots();
+  closeSettings();
+  showToast('settings saved ✦');
+  sfx.click();
 }
 
-/* ── TOAST ───────────────────────────────────────────────────── */
-let toastTimer;
-function toast(msg) {
-  const el = document.getElementById('toastEl');
-  el.textContent = msg; el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+function nudgeSetting(key, delta) {
+  const el  = document.getElementById(`s-${key}`);
+  const min = key === 'interval' ? 1 : 1;
+  const max = key === 'interval' ? 10 : 60;
+  el.textContent = Math.min(max, Math.max(min, (parseInt(el.textContent) || 0) + delta));
 }
 
-/* ── EVENT WIRING ────────────────────────────────────────────── */
-document.getElementById('playBtn').addEventListener('click', toggleTimer);
-document.getElementById('resetBtn').addEventListener('click', resetTimer);
-document.getElementById('skipBtn').addEventListener('click', skipSession);
-document.getElementById('settBtn').addEventListener('click', openSettings);
-document.getElementById('mxBtn').addEventListener('click', closeSettings);
-document.getElementById('saveBtn').addEventListener('click', saveSettings);
-document.getElementById('addBtn').addEventListener('click', addTask);
-document.getElementById('tinput').addEventListener('keydown', e => { if (e.key === 'Enter') addTask(); });
 
-document.getElementById('ovl').addEventListener('click', e => {
-  if (e.target === document.getElementById('ovl')) closeSettings();
-});
+/* ─────────────────────────────────────────────────────────
+   EVENT LISTENERS
+   ───────────────────────────────────────────────────────── */
 
-document.getElementById('modeWrap').addEventListener('click', e => {
-  const b = e.target.closest('.mb');
-  if (b) switchMode(b.dataset.mode);
-});
+function bindEvents() {
 
-document.getElementById('themeWrap').addEventListener('click', e => {
-  const b = e.target.closest('.tb');
-  if (b) { applyTheme(b.dataset.t); sfxClick(); }
-});
+  // play / pause
+  dom.playBtn.addEventListener('click', () => {
+    if (isRunning) { sfx.pause(); pauseTimer(); }
+    else           { sfx.play();  startTimer(); }
+  });
 
-document.querySelectorAll('.nb').forEach(b => {
-  b.addEventListener('click', () => adjSetting(b.dataset.k, parseInt(b.dataset.d)));
-});
+  // reset
+  dom.resetBtn.addEventListener('click', () => { sfx.click(); resetTimer(); });
 
-document.getElementById('tog-auto').addEventListener('click',  () => togSetting('autoStart'));
-document.getElementById('tog-sound').addEventListener('click', () => togSetting('sound'));
+  // skip
+  dom.skipBtn.addEventListener('click', () => { sfx.skip(); skipToNextSession(); });
 
-/* ── INIT ────────────────────────────────────────────────────── */
-loadData();
-applyMode();
-setQuote('idle');
-renderDots();
-renderTasks();
+  // mode tabs
+  dom.modeTabs.addEventListener('click', e => {
+    const btn = e.target.closest('.mode-tab');
+    if (!btn) return;
+    sfx.click();
+    switchMode(btn.dataset.mode);
+  });
+
+  // theme buttons
+  dom.themeSwitcher.addEventListener('click', e => {
+    const btn = e.target.closest('.theme-btn');
+    if (!btn) return;
+    sfx.click();
+    applyTheme(btn.dataset.theme);
+  });
+
+  // chill mode toggle
+  dom.chillBtn.addEventListener('click', () => {
+    sfx.click();
+    applyChillMode(!chillMode);
+  });
+
+  // ticker toggle
+  dom.tickerToggle.addEventListener('click', () => {
+    tickerVisible = !tickerVisible;
+    applyTickerState(true);
+    sfx.click();
+  });
+
+  // settings open / close / save
+  dom.settingsBtn.addEventListener('click', () => { sfx.click(); openSettings(); });
+  dom.modalClose.addEventListener('click',  () => { sfx.click(); closeSettings(); });
+  dom.modalSave.addEventListener('click',   saveSettings);
+  dom.settingsOverlay.addEventListener('click', e => {
+    if (e.target === dom.settingsOverlay) closeSettings();
+  });
+
+  // settings: +/- buttons
+  document.querySelectorAll('.num-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sfx.click();
+      nudgeSetting(btn.dataset.key, parseInt(btn.dataset.delta));
+    });
+  });
+
+  // settings: toggles
+  [dom.togAutostart, dom.togSound].forEach(tog => {
+    tog.addEventListener('click', () => {
+      sfx.click();
+      tog.classList.toggle('on');
+    });
+  });
+
+  // add task
+  dom.taskAddBtn.addEventListener('click', () => {
+    addTask(dom.taskInput.value);
+    dom.taskInput.value = '';
+  });
+  dom.taskInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { addTask(dom.taskInput.value); dom.taskInput.value = ''; }
+  });
+
+  // clear focused task chip
+  dom.focusedChipClear.addEventListener('click', () => {
+    sfx.click();
+    clearFocusedTask();
+  });
+
+  // close settings on Escape
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSettings();
+  });
+}
+
+
+/* ─────────────────────────────────────────────────────────
+   BOOT  — load state, render everything, start listening
+   ───────────────────────────────────────────────────────── */
+
+function boot() {
+  // load persisted state
+  config        = { ...DEFAULT_CONFIG, ...loadFromStorage('ga3_cfg', {}) };
+  tasks         = loadFromStorage('ga3_tasks', []);
+  focusedTaskId = loadFromStorage('ga3_focus', null);
+  theme         = loadFromStorage('ga3_theme', 'phonebooth');
+  chillMode     = loadFromStorage('ga3_chill', false);
+  tickerVisible = loadFromStorage('ga3_ticker', true);
+
+  // set initial timer state
+  totalSeconds  = config[mode] * 60;
+  leftSeconds   = totalSeconds;
+
+  // init all the things
+  initTicker();
+  spawnStars();
+  applyTheme(theme);
+  applyChillMode(chillMode);
+  applyTickerState(false);
+  updateTimerDisplay();
+  updateRingProgress();
+  updateModeUI();
+  updateSessionDots();
+  updateFocusedChip();
+  renderTasks();
+  setQuote(getQuoteFor('idle'));
+  bindEvents();
+
+  // ring dasharray fixed values
+  dom.ringProg.style.strokeDasharray = RING_CIRC;
+  dom.ringGlow.style.strokeDasharray = RING_CIRC;
+}
+
+boot(); 
